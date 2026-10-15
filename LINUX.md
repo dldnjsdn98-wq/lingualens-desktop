@@ -21,8 +21,8 @@ sudo apt install nodejs python3 python3-venv ca-certificates libgl1 libglib2.0-0
 ## 2. 압축 해제·설치·실행
 
 ```bash
-tar -xzf Language-Test-Linux-x64-0.4.3-preview.tar.gz
-cd Language-Test-Linux-x64-0.4.3
+tar -xzf Language-Test-Linux-x64-0.4.4-preview.tar.gz
+cd Language-Test-Linux-x64-0.4.4
 ./linux/install.sh
 ./linux/start.sh
 ```
@@ -31,7 +31,30 @@ cd Language-Test-Linux-x64-0.4.3
 
 브라우저에서 표시된 `http://127.0.0.1:포트` 주소로 접속합니다. 종료는 실행한 터미널에서 Ctrl+C입니다. Linux 테스트 배포본은 새 버전 확인을 제공하고, 파일 교체는 새 압축을 별도 폴더에 풀어 진행합니다. Windows 업데이터는 Windows 배포본을 갱신합니다.
 
+기본값은 사용 가능한 포트를 자동으로 고릅니다. 고정 포트가 이미 사용 중이면 `./linux/start.sh --port 0`으로 자동 선택하거나 다른 번호를 지정하세요. 옵션은 `./linux/start.sh --help`로 확인할 수 있습니다. 잘못된 옵션과 포트는 실행 전에 안내하며, Ctrl+C와 SIGTERM은 서버와 작업 프로세스를 정리합니다.
+
 ## 3. 화면 없는 실행과 자동 테스트
+
+### Git 소스에서 처음 설치할 때
+
+Git 저장소에는 큰 OCR 모델과 Debian wheel 파일을 넣지 않습니다. 소스를 받은 폴더에서 `bash linux/install.sh`를 실행하면 모델을 준비하고 Python 의존성을 설치합니다. 이 경우 인터넷 연결이 필요합니다. 모델은 `vendor/ocr/manifest.json`의 HTTPS 주소에서 받고 SHA-256이 일치할 때만 교체합니다. 다운로드나 검증 실패 시 기존 파일을 보존하며 설치를 중단합니다. 모델이 이미 정상인 배포본에서는 다시 내려받지 않습니다.
+
+모델만 준비하거나, 네트워크 없이 포함된 모델을 확인하려면:
+
+```bash
+python3 linux/prepare-models.py
+python3 linux/prepare-models.py --check
+```
+
+`--models /경로` 또는 `LINGUALENS_OCR_MODELS`로 모델 폴더를 지정할 수 있습니다. 다운로드 파일은 모델 폴더 안에서 임시 저장한 뒤 교체합니다. 해당 폴더에 쓰기 권한이 필요하며 모델별 다운로드 제한은 256MB입니다. Windows 소스 검사에서는 `python linux/prepare-models.py --check --models vendor/ocr/packages/rapidocr/models`로 번들 모델을 확인할 수 있습니다.
+
+모델 준비 도구의 회귀 검사는 외부 다운로드와 OCR 호출 없이 수행합니다:
+
+```bash
+python3 -B tests/model-preparation.test.py
+```
+
+다음 실행 예와 자동 테스트는 설치가 끝난 상태를 기준으로 합니다.
 
 ```bash
 ./linux/start.sh --headless --port 41837
@@ -55,6 +78,8 @@ dot에 맡길 기본 테스트:
 
 1. Node 자동 테스트: 판정, 캐시, 저장/복구/휴지통, 일괄 검증 실패, 수동 문제, 폴더 감시, 플랫폼 경로.
 2. Linux 런처의 HTTP 상태 확인과 종료.
+   자동 테스트에서 옵션 오류·포트 충돌·종료 신호·테스트 임시 폴더 정리도 검사합니다.
+   모델 준비 도구의 모의 다운로드·해시 실패·기존 파일 보존 검사도 실행합니다.
 3. Python/OpenCV/ONNX Runtime 로딩과 OCR 모델 4개 해시.
 4. 양수·음수 이동, 특징 없는 화면 거부, 해상도 불일치/크기 맞춤 정렬 테스트.
 5. 포함한 합성 이미지에서 실제 로컬 OCR로 `Start`, `42` 인식, 정렬 실행.

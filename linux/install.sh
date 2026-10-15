@@ -7,6 +7,7 @@ if [[ "$(uname -s)" != Linux || "$(uname -m)" != x86_64 ]]; then
 fi
 node -e 'if(Number(process.versions.node.split(".")[0])<20)throw Error("Node.js 20+ required")'
 python3 -c 'import sys; assert sys.version_info >= (3,11), "Python 3.11+ required"'
+python3 linux/prepare-models.py
 python3 -m venv vendor/ocr/venv
 if [[ -d vendor/ocr/wheels && "$(vendor/ocr/venv/bin/python -c 'import sys;print(str(sys.version_info.major)+"."+str(sys.version_info.minor))')" == 3.13 ]]; then
   vendor/ocr/venv/bin/python -m pip install --no-index --find-links vendor/ocr/wheels --require-hashes -r linux/requirements-debian13.txt

@@ -18,8 +18,9 @@ function mountWorkbench(){
   right.append(settingsPane,resultsPane);settingsPane.append(inspector);resultsPane.append($('resultCard'));
   right.append($('progress'),document.querySelector('.runbar'));
   const top=document.querySelector('.topbar'),actions=document.createElement('div');actions.className='workbench-top-actions';
-  actions.innerHTML='<span id="saveIndicator" class="save-indicator" role="status">새 작업</span><button id="openLibrary" class="ghost small">저장 작업</button><button id="openSettings" class="ghost small">설정</button>';
+  actions.innerHTML='<span id="saveIndicator" class="save-indicator" role="status">새 작업</span><button id="retryDraft" class="secondary small hidden">임시 저장 재시도</button><button id="openLibrary" class="ghost small">저장 작업</button><button id="openSettings" class="ghost small">설정</button>';
   actions.append($('versionCheck'));document.querySelector('.shortcuts').remove();top.append(actions);
+  $('retryDraft').onclick=async()=>{if(W.busy||W.operation||S.controller||!W.dirty||!W.items.length)return;const unlock=lockWorkspace();try{$('draftStatus').textContent='임시 저장 다시 시도 중…';const result=await saveDraft(true);if(result.ok&&result.saved)error('')}finally{unlock()}};
   const provider=document.createElement('div');provider.className='workbench-provider';provider.append($('cloudProject'),$('connectState'));top.append(provider);
   $('cloudProject').setAttribute('aria-label','분석 도구');
   $('cloudProject').querySelector('[value="local"]').textContent='로컬 OCR · 빠른 분석';$('cloudProject').querySelector('[value="codex"]').textContent='Codex';$('cloudProject').querySelector('[value="gemini"]').textContent='Gemini';
@@ -31,6 +32,7 @@ function mountWorkbench(){
   details.find(x=>x.textContent.includes('자주 쓰는 문구'))?.classList.add('preset-tools');
   for(const node of details){if(node.id==='recoveryPanel'||node.id==='folderTools')continue;if(node.querySelector('#projectLibrary')){node.open=true;libraryDialog.append(node)}else{node.open=true;settingsDialog.append(node)}}
   historyDialog.append(document.querySelector('.history-card'));
+  const historyStatus=document.createElement('p');historyStatus.id='historyStatus';historyStatus.className='help';historyStatus.setAttribute('role','status');$('history').before(historyStatus);
   $('openSettings').onclick=()=>settingsDialog.showModal();$('openLibrary').onclick=()=>{refreshLibrary();refreshTrash();libraryDialog.showModal()};
   const historyButton=document.createElement('button');historyButton.id='openHistory';historyButton.className='ghost small';historyButton.textContent='최근 기록';historyButton.onclick=()=>historyDialog.showModal();settingsDialog.prepend(historyButton);
   const head=side.querySelector('.head');head.querySelector('h2').textContent='작업 이미지';head.querySelector('p').remove();
@@ -63,7 +65,7 @@ function mountWorkbench(){
   new MutationObserver(refreshSavedIndicator).observe($('draftStatus'),{childList:true,subtree:true});new MutationObserver(refreshSavedIndicator).observe($('workspaceStatus'),{childList:true,subtree:true});
   layout.remove();UI.ready=true;setCanvasMode('select');setWorkbenchTab('settings');refreshWorkbench();
 }
-function refreshSavedIndicator(){if(!UI?.ready)return;const indicator=$('saveIndicator');indicator.textContent=!W.items.length?'새 작업':!W.dirty?(W.projectId?'작업 목록에 저장됨':'저장 전'):$('draftStatus').textContent.startsWith('임시 저장됨')?'임시 저장됨':$('draftStatus').textContent.startsWith('임시 저장 실패')?'임시 저장 실패':'변경 사항 저장 중';indicator.dataset.state=W.dirty?'draft':'saved';indicator.title=$('workspaceStatus').textContent+' · '+$('draftStatus').textContent}
+function refreshSavedIndicator(){if(!UI?.ready)return;const failed=W.dirty&&$('draftStatus').textContent.startsWith('임시 저장 실패'),indicator=$('saveIndicator');indicator.textContent=!W.items.length?'새 작업':!W.dirty?(W.projectId?'작업 목록에 저장됨':'저장 전'):$('draftStatus').textContent.startsWith('임시 저장됨')?'임시 저장됨':failed?'임시 저장 실패':'변경 사항 저장 중';indicator.dataset.state=failed?'error':W.dirty?'draft':'saved';indicator.title=$('workspaceStatus').textContent+' · '+$('draftStatus').textContent;$('retryDraft').classList.toggle('hidden',!failed||!W.items.length);$('retryDraft').disabled=!!(W.busy||W.operation||S.controller)}
 function refreshWorkbench(){if(!UI?.ready)return;
   const busy=!!(W.busy||W.operation||S.controller),selected=W.items.filter(x=>x.selected).length,filter=$('imageStatusFilter').value;
   let visible=0;for(const row of $('imageQueue').children){const item=W.items.find(x=>x.id===row.dataset.item);if(!item)continue;const state=imageSummary(item);const show=(filter==='all'||(filter==='attention'?needsAttention(item):state.state===filter))&&item.file.name.toLocaleLowerCase().includes($('imageSearch').value.trim().toLocaleLowerCase());row.classList.toggle('hidden',!show);if(show)visible++;row.dataset.state=state.state;const button=row.querySelector('[data-image]');button.setAttribute('aria-current',item.id===W.active?'true':'false');button.querySelector('small').textContent=state.label}

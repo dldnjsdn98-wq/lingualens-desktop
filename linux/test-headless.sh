@@ -9,6 +9,7 @@ export XDG_DATA_HOME="$REPORT_DIR/data" XDG_CACHE_HOME="$REPORT_DIR/cache"
 trap 'echo "테스트 로그: $REPORT_DIR"' EXIT
 node --test tests/*.test.mjs 2>&1 | tee "$REPORT_DIR/node-tests.txt"
 node linux/launch.mjs --selftest 2>&1 | tee "$REPORT_DIR/launcher.txt"
+python3 -B tests/model-preparation.test.py 2>&1 | tee "$REPORT_DIR/model-preparation.txt"
 if [[ "${1:-}" == --skip-ocr ]]; then
   echo 'SKIP: OCR runtime, alignment and actual OCR smoke tests' | tee "$REPORT_DIR/ocr-skipped.txt"
 else

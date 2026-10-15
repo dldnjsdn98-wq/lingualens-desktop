@@ -2,11 +2,11 @@
 
 스크린샷의 글자를 로컬 OCR 또는 개인 계정으로 로그인한 공식 CLI가 추출하고, 기존 비교 로직이 문구별 일치 여부를 판정하는 Windows 앱입니다.
 
-**0.4.3:** 검수 검색·필터·단축키, 메모 자동 저장, 영역 잠금·다중 편집, 미니맵·화면 설정 저장, 작업 프로필, OCR 읽기 순서, 취소 가능한 비교·슬라이더·기준 이력을 포함합니다. [전체 변경 사항](CHANGES-0.4.3.md), [검증 결과](VALIDATION-0.4.3.md)를 확인하세요. Debian 13 x64 소스·모델·테스트 배포는 [Linux 실행 안내](LINUX.md)를 따르세요.
+**0.4.4:** OCR 취소·저장 실패 복구·영역 재인식 판정 일관성을 개선했습니다. 검수 검색·필터·단축키, 메모 자동 저장, 영역 잠금·다중 편집, 미니맵·화면 설정 저장, 작업 프로필, OCR 읽기 순서, 취소 가능한 비교·슬라이더·기준 이력을 포함합니다. [전체 변경 사항](CHANGES-0.4.4.md), [검증 결과](VALIDATION-0.4.4.md)를 확인하세요. Debian 13 x64 소스·모델·테스트 배포는 [Linux 실행 안내](LINUX.md)를 따르세요.
 
 ## 실행
 
-Windows 첫 설치는 [최신 릴리스](https://github.com/dldnjsdn98-wq/lingualens-desktop/releases/latest)의 `Language-Test-Setup-0.4.3.zip`을 받아 압축을 풀고 `Install.cmd`를 실행하세요. Linux는 `Language-Test-Linux-x64-0.4.3-preview.tar.gz`를 사용합니다.
+Windows 첫 설치는 [최신 릴리스](https://github.com/dldnjsdn98-wq/lingualens-desktop/releases/latest)의 `Language-Test-Setup-0.4.4.zip`을 받아 압축을 풀고 `Install.cmd`를 실행하세요. Linux는 `Language-Test-Linux-x64-0.4.4-preview.tar.gz`를 사용합니다.
 
 1. 배포 ZIP을 풀고 `LinguaLens.exe`를 실행합니다. Microsoft Edge가 필요합니다.
 2. 기본 `빠른 로컬 OCR`은 실행 환경과 모델이 포함되어 있으며 설치·로그인·API 키 없이 사용할 수 있습니다. AI로 분석하려면 Codex 또는 Gemini를 선택합니다. 앱은 Codex 데스크톱 앱에 포함된 CLI와 공식 Antigravity CLI의 일반 설치 경로를 확인합니다. 도구가 없다면 앱의 `설치 방법 보기`에서 공식 안내를 열 수 있습니다.
@@ -35,6 +35,8 @@ CLI를 별도로 설치한 뒤에는 앱에서 `로그인 상태 다시 확인`�
 
 ## 개발
 
+2026-10-14 로컬 소스의 추가 수정과 검사 결과는 [검증 기록](VALIDATION-2026-10-14.md)에 정리했습니다. 해당 변경은 0.4.4에 반영했습니다.
+
 이 저장소의 기본 브랜치에는 앱 소스·테스트·Windows 빌드 스크립트·Linux 실행 스크립트가 있습니다. Node.js 20 이상에서 아래 명령으로 공통 로직을 검사할 수 있습니다.
 
 ```sh
@@ -44,7 +46,21 @@ node --test tests/*.test.mjs
 node src/server.js
 ```
 
-브라우저 라이브러리는 `vendor/`에 포함하므로 공통 테스트에 별도 npm 설치는 필요하지 않습니다. OCR 런타임·대용량 모델·설치 파일은 Git에 넣지 않습니다. Windows OCR 번들은 Python 3.12에서 `python Prepare-OCR.py`로 준비한 뒤 `Build-Release.ps1 -NodePath <node.exe 경로>`로 빌드합니다. Linux에서 실제 OCR도 실행하려면 최신 Linux 패키지의 `vendor/ocr/`를 같은 경로에 복사하고 [Linux 실행 안내](LINUX.md)를 따르세요. CLI 실계정 로그인과 실제 OCR은 공통 자동 테스트와 별도로 확인합니다.
+브라우저 라이브러리는 `vendor/`에 포함하므로 공통 테스트에 별도 npm 설치는 필요하지 않습니다. OCR 런타임·대용량 모델·설치 파일은 Git에 넣지 않습니다. Windows OCR 번들은 Python 3.12에서 `python Prepare-OCR.py`로 준비한 뒤 `Build-Release.ps1 -NodePath <node.exe 경로>`로 빌드합니다. Linux 소스는 `bash linux/install.sh`로 모델과 OCR 환경을 준비할 수 있습니다. 모델이 포함된 배포본과 소스 설치의 네트워크 차이는 [Linux 실행 안내](LINUX.md)를 확인하세요. CLI 실계정 로그인과 실제 OCR은 공통 자동 테스트와 별도로 확인합니다.
+
+화면 회귀 검사는 선택적으로 실행합니다. 개발 환경에 Playwright를 준비한 뒤 다음 명령을 사용하세요.
+
+```sh
+npm install --no-save --package-lock=false playwright
+npm run test:browser
+npm run test:comparison
+```
+
+Windows에서는 설치된 Edge를 먼저 찾습니다. Linux 등에서 Chromium이 없다면 `npx playwright install chromium`으로 테스트 브라우저를 준비하세요. OS 라이브러리 준비는 [Playwright 공식 브라우저 안내](https://playwright.dev/docs/browsers)를 따르세요. 이미 설치된 Playwright 패키지 폴더는 `LANGUAGE_TEST_PLAYWRIGHT_MODULE`, 브라우저 실행 파일은 `LANGUAGE_TEST_BROWSER_PATH`로 지정할 수 있습니다.
+
+이 검사는 새 headless 브라우저와 분리된 임시 서버에서 합성 이미지·모의 AI 응답만 사용합니다. 다중 이미지, 저장 복원, 서버 실패 후 재시도, 손상 파일, 저장 실패 보호, 검수 필터·단축키·다음 이동, 작은 화면을 검사합니다. 사용자 작업과 로그인 세션을 사용하지 않습니다. 결과 JSON·스크린샷은 테스트용 임시 폴더에 남기며, 출력 경로를 정하려면 `LANGUAGE_TEST_TEST_OUTPUT`을 지정하세요. 실패하면 0 이외의 종료 코드로 끝납니다.
+
+`test:comparison`은 실제 비교 Worker의 동일 이미지 결과, 손상된 기준·업로드 실패 시 이력 보존, 다운로드·자동 위치 맞추기 취소, 창 닫기와 재실행, 슬라이더·번갈아 보기 종료를 검사합니다. 느린 네트워크와 업로드 실패는 테스트가 모의하며 실제 AI 계정을 호출하지 않습니다.
 
 Node.js 20 이상에서 `node src/server.js`를 실행하면 로컬 URL이 표시됩니다. `node --test tests/*.test.mjs`로 모의 CLI 응답의 문구 판정을 확인합니다. 런처와 업데이터는 Windows .NET Framework C# 컴파일러로 빌드합니다. `node.exe`, `src`, `vendor`, 두 실행 파일, `version.txt`, `release-channel.json`을 배포 폴더에 포함해야 합니다.
 

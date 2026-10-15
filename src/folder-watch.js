@@ -6,7 +6,7 @@ import {fileURLToPath} from 'node:url';
 import {homedir} from 'node:os';
 const types={'.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.webp':'image/webp'};
 export function folderWatch({now=Date.now}={}){
- let session=null;
+ let session=null,generation=0;
  async function scan(root,depth=0,list=[]){
   if(depth>4)return list;
   for(const entry of await readdir(root,{withFileTypes:true})){
@@ -17,16 +17,16 @@ export function folderWatch({now=Date.now}={}){
   }return list;
  }
  return {
-  async start(path,includeExisting=false){const root=await realpath(resolve(path));if(!(await stat(root)).isDirectory())throw Error('이미지 폴더를 선택하세요.');const list=await scan(root);session={id:randomUUID(),root,seen:new Set(includeExisting?[]:list.map(x=>x.path+'|'+x.size+'|'+x.mtime)),samples:new Map(),pending:new Map()};return {id:session.id,path:root}},
-  stop(){session=null},
+  async start(path,includeExisting=false){const ticket=++generation,root=await realpath(resolve(path));if(!(await stat(root)).isDirectory())throw Error('이미지 폴더를 선택하세요.');const list=await scan(root);if(ticket!==generation)throw Error('자동 가져오기 시작이 취소됐습니다.');session={id:randomUUID(),root,seen:new Set(includeExisting?[]:list.map(x=>x.path+'|'+x.size+'|'+x.mtime)),samples:new Map(),pending:new Map()};return {id:session.id,path:root}},
+  stop(){generation++;session=null},
   async poll(id){if(!session||session.id!==id)throw Error('자동 가져오기를 다시 시작하세요.');const s=session,list=await scan(s.root),present=new Set(list.map(x=>x.path));
-   const stamps=new Map(list.map(f=>[f.path,f.path+'|'+f.size+'|'+f.mtime]));
+   if(session!==s)throw Error('자동 가져오기가 종료됐습니다.');const stamps=new Map(list.map(f=>[f.path,f.path+'|'+f.size+'|'+f.mtime]));
    for(const [key,v] of s.pending)if(!present.has(v.path)||stamps.get(v.path)!==v.stamp)s.pending.delete(key);
    const timestamp=now();for(const file of list){const stamp=file.path+'|'+file.size+'|'+file.mtime;if(s.seen.has(stamp))continue;const prev=s.samples.get(file.path);if(!prev||prev.stamp!==stamp){s.samples.set(file.path,{stamp,at:timestamp});continue}if(timestamp-prev.at<2000)continue;if(![...s.pending.values()].some(x=>x.stamp===stamp))s.pending.set(randomUUID(),{...file,stamp,name:relative(s.root,file.path).replaceAll('\\','/')})}
    for(const key of s.samples.keys())if(!present.has(key))s.samples.delete(key);
    return {files:[...s.pending].slice(0,20).map(([key,f])=>({key,name:f.name,size:f.size,type:f.type})),pending:s.pending.size};
   },
-  async read(id,key){if(!session||session.id!==id)throw Error('자동 가져오기가 종료됐습니다.');const file=session.pending.get(key);if(!file)throw Error('이미지 목록을 다시 확인하세요.');const actual=await realpath(file.path),rel=relative(session.root,actual);if(rel.startsWith('..')||isAbsolute(rel))throw Error('선택한 폴더 안의 이미지만 가져올 수 있습니다.');const s=await stat(actual);if(s.size!==file.size||s.mtimeMs!==file.mtime)throw Error('이미지 저장이 끝난 뒤 다시 가져옵니다.');const bytes=await readFile(actual);return {bytes,type:file.type,name:file.name}},
+  async read(id,key){if(!session||session.id!==id)throw Error('자동 가져오기가 종료됐습니다.');const current=session,file=current.pending.get(key);if(!file)throw Error('이미지 목록을 다시 확인하세요.');const actual=await realpath(file.path),rel=relative(current.root,actual);if(rel.startsWith('..')||isAbsolute(rel))throw Error('선택한 폴더 안의 이미지만 가져올 수 있습니다.');const s=await stat(actual);if(s.size!==file.size||s.mtimeMs!==file.mtime)throw Error('이미지 저장이 끝난 뒤 다시 가져옵니다.');const bytes=await readFile(actual);if(session!==current)throw Error('자동 가져오기가 종료됐습니다.');return {bytes,type:file.type,name:file.name}},
   ack(id,keys){if(!session||session.id!==id)return;for(const key of keys){const f=session.pending.get(key);if(f){session.seen.add(f.stamp);session.pending.delete(key)}}}
  };
 }

@@ -16,6 +16,31 @@ test('comparison cancellation terminates its Worker and rejects before applying 
  controller.abort();await assert.rejects(request,{name:'AbortError'});assert.equal(stopped,1);
 });
 
+test('an already cancelled comparison does not start a Worker',async()=>{
+ let started=0;class FakeWorker{constructor(){started++}}
+ const source=enhancementClient.slice(enhancementClient.indexOf('function diffInWorker('),enhancementClient.indexOf('function comparisonPresentation('));
+ const context=vm.createContext({Worker:FakeWorker,DOMException,$:()=>({})});vm.runInContext(source,context);
+ const controller=new AbortController();controller.abort();
+ await assert.rejects(context.diffInWorker(new Uint8Array(4),new Uint8Array(4),1,1,.1,controller.signal),{name:'AbortError'});assert.equal(started,0);
+});
+
+test('late Worker messages cannot overwrite cancellation feedback or complete another result',async()=>{
+ let worker,stopped=0;const info={textContent:'before'};
+ class FakeWorker{constructor(){worker=this}postMessage(){}terminate(){stopped++}}
+ const source=enhancementClient.slice(enhancementClient.indexOf('function diffInWorker('),enhancementClient.indexOf('function comparisonPresentation('));
+ const context=vm.createContext({Worker:FakeWorker,DOMException,$:()=>info});vm.runInContext(source,context);
+ const controller=new AbortController(),request=context.diffInWorker(new Uint8Array(4),new Uint8Array(4),1,1,.1,controller.signal),oldMessage=worker.onmessage;
+ controller.abort();await assert.rejects(request,{name:'AbortError'});info.textContent='cancelled';oldMessage({data:{stage:'late stage'}});oldMessage({data:{changed:99}});
+ assert.equal(info.textContent,'cancelled');assert.equal(stopped,1);assert.equal(worker.onmessage,null);
+});
+
+test('Worker message transfer failure rejects and releases the Worker',async()=>{
+ let stopped=0;class FakeWorker{postMessage(){throw Error('transfer failed')}terminate(){stopped++}}
+ const source=enhancementClient.slice(enhancementClient.indexOf('function diffInWorker('),enhancementClient.indexOf('function comparisonPresentation('));
+ const context=vm.createContext({Worker:FakeWorker,DOMException,$:()=>({})});vm.runInContext(source,context);
+ await assert.rejects(context.diffInWorker(new Uint8Array(4),new Uint8Array(4),1,1,.1,new AbortController().signal),/transfer failed/);assert.equal(stopped,1);
+});
+
 test('real comparison Worker detects changes and returns transferred mask at 2340x1080',async()=>{
  const root=await mkdtemp(join(tmpdir(),'language-comparison-worker-'));let worker;
  try{

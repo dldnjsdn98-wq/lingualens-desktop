@@ -13,9 +13,11 @@ for folder in ['src','linux']:
 for p in (root/'tests').glob('*.test.mjs'):files.append((p,p.relative_to(root).as_posix()))
 for p in (root/'tests/fixtures').iterdir():
     if p.is_file():files.append((p,p.relative_to(root).as_posix()))
-for path in ['tests/alignment.test.py','tests/headless-local.mjs','package.json',
+for path in ['tests/alignment.test.py','tests/model-preparation.test.py','tests/headless-local.mjs','tests/browser-smoke.mjs','tests/browser-runtime.mjs','tests/browser-comparison.mjs','package.json',
              'version.txt','release-channel.json','README.md','LINUX.md',f'CHANGES-{version}.md',f'VALIDATION-{version}.md','THIRD_PARTY_NOTICES.md']:
     files.append((root/path,path))
+for report in root.glob('VALIDATION-20*.md'):
+    files.append((report,report.name))
 for p in (root/'vendor').iterdir():
     if p.is_file():files.append((p,p.relative_to(root).as_posix()))
 for name in ['manifest.json','RAPIDOCR-LICENSE.txt','PADDLEOCR-LICENSE.txt']:

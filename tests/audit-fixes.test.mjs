@@ -16,6 +16,20 @@ import {migrateReviews} from '../src/enhancement-tools.js';
 import {reviewOverview} from '../src/ux-tools.js';
 const target={id:'t',text:'Start',language:'en',mode:'exact',region:null};
 const payload={id:'old-run',result:{found:true,totalCount:1,foundCount:1,results:[{...target,found:true}],lines:[]}};
+test('corrupt image in a mixed upload preserves the workspace and releases controls with a readable error',async()=>{
+ const original={id:'existing',file:{name:'original.png',type:'image/png',size:12},payload};
+ const elements=new Map(),get=id=>{if(!elements.has(id))elements.set(id,{});return elements.get(id)};
+ let closed=0,unlocked=0;
+ class Transfer{constructor(){this.files=[];this.items={add:file=>this.files.push(file)}}}
+ const c={W:{items:[original],active:original.id},S:{},$:get,DataTransfer:Transfer,errors:[],error:m=>c.errors.push(m),snapshot:()=>{},lockWorkspace:()=>()=>unlocked++,createImageBitmap:async file=>{if(file.name==='broken.png')throw Error('The source image could not be decoded.');return{width:200,height:100,close:()=>closed++}}};
+ vm.createContext(c);
+ vm.runInContext(workspaceClient.slice(workspaceClient.indexOf('async function decodeWorkspaceImage('),workspaceClient.indexOf('function snapshot()')),c);
+ vm.runInContext(workspaceClient.slice(workspaceClient.indexOf('async function addImages('),workspaceClient.indexOf('const encodedFiles=')),c);
+ await c.addImages([{name:'valid.png',type:'image/png',size:12},{name:'broken.png',type:'image/png',size:12}]);
+ assert.equal(c.W.items.length,1);assert.equal(c.W.items[0],original);assert.equal(c.W.active,original.id);
+ assert.equal(get('imageInput').files[0],original.file);assert.equal(closed,1);assert.equal(unlocked,1);
+ assert.match(c.errors[0],/이미지를 읽지 못했습니다.*손상/);
+});
 function context(item){
  const elements=new Map(),get=id=>{if(!elements.has(id))elements.set(id,{value:'',textContent:''});return elements.get(id)};
  get('cloudProject').value='codex';get('analysisMode').value='fast';get('autoReviewProvider').value='off';

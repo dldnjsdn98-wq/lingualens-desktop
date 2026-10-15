@@ -6,6 +6,9 @@ $folder = Join-Path $root 'release\LinguaLens'
 $releaseRoot = [IO.Path]::GetFullPath((Join-Path $root 'release'))
 $resolved = [IO.Path]::GetFullPath($folder)
 if (!$resolved.StartsWith($releaseRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) { throw '배포 경로가 잘못되었습니다.' }
+foreach ($candidate in @($releaseRoot, $resolved)) {
+  if ((Test-Path -LiteralPath $candidate) -and ((Get-Item -LiteralPath $candidate -Force).Attributes -band [IO.FileAttributes]::ReparsePoint)) { throw '배포 폴더에 연결 경로를 사용할 수 없습니다.' }
+}
 if (!$NodePath) {
   $command = Get-Command node.exe -ErrorAction SilentlyContinue
   if ($command) { $NodePath = $command.Source }
@@ -24,7 +27,10 @@ if (!(Test-Path (Join-Path $root 'vendor\ocr\python.exe'))) { throw '로컬 OCR 
 Copy-Item -LiteralPath (Join-Path $root 'vendor\ocr') -Destination $vendor -Recurse -Force
 Copy-Item (Join-Path $root 'vendor\pixelmatch.js'),(Join-Path $root 'vendor\PIXELMATCH-LICENSE.txt'),(Join-Path $root 'vendor\pixelmatch-manifest.json') $vendor -Force
 Copy-Item $NodePath (Join-Path $folder 'node.exe')
-Copy-Item (Join-Path $root 'README.md'),(Join-Path $root 'version.txt'),(Join-Path $root 'release-channel.json'),(Join-Path $root 'THIRD_PARTY_NOTICES.md'),(Join-Path $root "CHANGES-$version.md"),(Join-Path $root "VALIDATION-$version.md"),(Join-Path $root 'LINUX.md') $folder
+$documentation = @('README.md','THIRD_PARTY_NOTICES.md',"CHANGES-$version.md","VALIDATION-$version.md",'LINUX.md') + @(Get-ChildItem -LiteralPath $root -Filter 'VALIDATION-20*.md' -File | Select-Object -ExpandProperty Name)
+$documentation = @($documentation | Select-Object -Unique)
+foreach ($document in $documentation) { Copy-Item -LiteralPath (Join-Path $root $document) -Destination $folder -Force }
+Copy-Item (Join-Path $root 'version.txt'),(Join-Path $root 'release-channel.json') $folder
 if (Test-Path (Join-Path $root 'NODE-LICENSE.txt')) { Copy-Item (Join-Path $root 'NODE-LICENSE.txt') $folder }
 $compiler = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
 if (!(Test-Path $compiler)) { throw 'Windows .NET Framework C# 컴파일러가 필요합니다.' }
@@ -40,8 +46,10 @@ try {
   $asset = Join-Path $root 'LinguaLens-Windows.zip'
   $setup = Join-Path $root ('Language-Test-Setup-' + $version + '.zip')
   Compress-Archive -LiteralPath $folder -DestinationPath $asset -Force
-  Copy-Item (Join-Path $root 'Install.cmd'),(Join-Path $root 'Install.ps1'),(Join-Path $root 'README.md') (Join-Path $root 'release') -Force
-  Compress-Archive -Path (Join-Path $root 'release\*') -DestinationPath $setup -Force
+  $installerFiles = @('Install.cmd','Install.ps1') + $documentation
+  foreach ($file in $installerFiles) { Copy-Item -LiteralPath (Join-Path $root $file) -Destination $releaseRoot -Force }
+  $setupInputs = @($folder) + @($installerFiles | ForEach-Object { Join-Path $releaseRoot $_ })
+  Compress-Archive -LiteralPath $setupInputs -DestinationPath $setup -Force
   Write-Output ('Version: ' + $version)
   Write-Output ('Release asset: ' + $asset)
   Write-Output ('SHA-256: ' + (Get-FileHash $asset -Algorithm SHA256).Hash)
