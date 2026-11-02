@@ -2,11 +2,11 @@
 
 스크린샷의 글자를 로컬 OCR 또는 개인 계정으로 로그인한 공식 CLI가 추출하고, 기존 비교 로직이 문구별 일치 여부를 판정하는 Windows 앱입니다.
 
-**0.4.4:** OCR 취소·저장 실패 복구·영역 재인식 판정 일관성을 개선했습니다. 검수 검색·필터·단축키, 메모 자동 저장, 영역 잠금·다중 편집, 미니맵·화면 설정 저장, 작업 프로필, OCR 읽기 순서, 취소 가능한 비교·슬라이더·기준 이력을 포함합니다. [전체 변경 사항](CHANGES-0.4.4.md), [검증 결과](VALIDATION-0.4.4.md)를 확인하세요. Debian 13 x64 소스·모델·테스트 배포는 [Linux 실행 안내](LINUX.md)를 따르세요.
+**0.4.5:** 상단 이미지·결과 목록과 하단 검수 도크로 화면을 재구성했습니다. 긴 문구·모바일 검수, OCR 취소·재개, 로그인 재시도, 중복 제거 백업과 저장 실패 복구를 개선했습니다. [변경 사항](CHANGES-0.4.5.md), [검증 결과](VALIDATION-0.4.5.md), [Linux 실행 안내](LINUX.md)를 확인하세요.
 
 ## 실행
 
-Windows 첫 설치는 [최신 릴리스](https://github.com/dldnjsdn98-wq/lingualens-desktop/releases/latest)의 `Language-Test-Setup-0.4.4.zip`을 받아 압축을 풀고 `Install.cmd`를 실행하세요. Linux는 `Language-Test-Linux-x64-0.4.4-preview.tar.gz`를 사용합니다.
+Windows 첫 설치는 [최신 릴리스](https://github.com/dldnjsdn98-wq/lingualens-desktop/releases/latest)의 `Language-Test-Setup-0.4.5.zip`을 받아 압축을 풀고 `Install.cmd`를 실행하세요. Linux는 `Language-Test-Linux-x64-0.4.5-preview.tar.gz`를 사용합니다.
 
 1. 배포 ZIP을 풀고 `LinguaLens.exe`를 실행합니다. Microsoft Edge가 필요합니다.
 2. 기본 `빠른 로컬 OCR`은 실행 환경과 모델이 포함되어 있으며 설치·로그인·API 키 없이 사용할 수 있습니다. AI로 분석하려면 Codex 또는 Gemini를 선택합니다. 앱은 Codex 데스크톱 앱에 포함된 CLI와 공식 Antigravity CLI의 일반 설치 경로를 확인합니다. 도구가 없다면 앱의 `설치 방법 보기`에서 공식 안내를 열 수 있습니다.
@@ -54,6 +54,8 @@ node src/server.js
 npm install --no-save --package-lock=false playwright
 npm run test:browser
 npm run test:comparison
+npm run test:lifecycle
+npm run test:design
 ```
 
 Windows에서는 설치된 Edge를 먼저 찾습니다. Linux 등에서 Chromium이 없다면 `npx playwright install chromium`으로 테스트 브라우저를 준비하세요. OS 라이브러리 준비는 [Playwright 공식 브라우저 안내](https://playwright.dev/docs/browsers)를 따르세요. 이미 설치된 Playwright 패키지 폴더는 `LANGUAGE_TEST_PLAYWRIGHT_MODULE`, 브라우저 실행 파일은 `LANGUAGE_TEST_BROWSER_PATH`로 지정할 수 있습니다.
@@ -61,6 +63,12 @@ Windows에서는 설치된 Edge를 먼저 찾습니다. Linux 등에서 Chromium
 이 검사는 새 headless 브라우저와 분리된 임시 서버에서 합성 이미지·모의 AI 응답만 사용합니다. 다중 이미지, 저장 복원, 서버 실패 후 재시도, 손상 파일, 저장 실패 보호, 검수 필터·단축키·다음 이동, 작은 화면을 검사합니다. 사용자 작업과 로그인 세션을 사용하지 않습니다. 결과 JSON·스크린샷은 테스트용 임시 폴더에 남기며, 출력 경로를 정하려면 `LANGUAGE_TEST_TEST_OUTPUT`을 지정하세요. 실패하면 0 이외의 종료 코드로 끝납니다.
 
 `test:comparison`은 실제 비교 Worker의 동일 이미지 결과, 손상된 기준·업로드 실패 시 이력 보존, 다운로드·자동 위치 맞추기 취소, 창 닫기와 재실행, 슬라이더·번갈아 보기 종료를 검사합니다. 느린 네트워크와 업로드 실패는 테스트가 모의하며 실제 AI 계정을 호출하지 않습니다.
+
+`test:lifecycle`은 로그인 시작·진행 중 도구 전환, 실패 후 재시도, OCR 일괄 취소 후 기존 검수 보존과 이어 실행을 검사합니다. 로그인과 OCR은 모의 서버를 사용하며 계정에 접근하지 않습니다. Linux 패키지에도 검사 소스를 포함합니다.
+
+`test:design`은 합성 이미지와 모의 OCR로 하단 검수 도크의 기하, 검수 메모·판정 버튼, 결과 행의 실제 표시 공간, 패널 크기 조절·집중 보기, 작은 화면의 작업 영역 전환과 확대·이동 유지, 비교창 제목 고정을 검사합니다. 16:9 합성 게임 화면, 긴 한국어·일본어, 여러 결과와 200%에 해당하는 720×450 CSS 화면도 확인하고 실제 UI 시안을 저장합니다. 자동 로컬 재확인은 끄고 로컬 OCR 요청을 차단하여 모의 extractor만 사용합니다. 결과 위치는 `LANGUAGE_TEST_TEST_OUTPUT`으로 지정할 수 있습니다.
+
+검증 결과를 고르면 상단 이미지와 결과 목록 아래에 기대·OCR·사유 및 메모·수동 판정을 함께 읽는 검수 도크가 열립니다. 긴 근거는 페이지 높이를 늘립니다. 작은 화면은 이미지·검수·작업 목록을 전환하며, 430px 이하의 기대/OCR은 한 열로 이어집니다. 이번 변경과 검증 기록은 [IMPLEMENTATION-2026-11-02-BOLD.md](IMPLEMENTATION-2026-11-02-BOLD.md)에 있습니다.
 
 Node.js 20 이상에서 `node src/server.js`를 실행하면 로컬 URL이 표시됩니다. `node --test tests/*.test.mjs`로 모의 CLI 응답의 문구 판정을 확인합니다. 런처와 업데이터는 Windows .NET Framework C# 컴파일러로 빌드합니다. `node.exe`, `src`, `vendor`, 두 실행 파일, `version.txt`, `release-channel.json`을 배포 폴더에 포함해야 합니다.
 
@@ -79,6 +87,8 @@ Codex는 공식 `codex exec`의 이미지 및 출력 스키마 옵션을 사용�
 - 저장한 작업 폴더 열기에서 폴더를 골라 다시 엽니다. 폴더명을 변경해 저장하면 이동합니다.
 - 저장 위치: %LOCALAPPDATA%\LinguaLens\projects. 앱 업데이트와 별도로 유지됩니다.
 - 작업 파일 내보내기/가져오기로 백업할 수 있습니다. 파일에는 원본 이미지가 포함됩니다.
+- 0.4.4 이후 로컬 개선본은 백업 v2에서 원본·비교 기준·이력의 같은 이미지를 한 번만 포함합니다. 새 백업은 이 개선본에서 열어야 하며 기존 v1 백업도 읽습니다. 가져온 백업은 임시 저장되어 앱에 저장하기 전에도 복구할 수 있습니다.
+- 백업 파일은 750MB 이하입니다. 초과하면 내보내기 전에 작업을 나누라는 안내를 표시합니다. 이미지마다 나누어 저장·읽으므로 전체 원본을 하나의 큰 문자열로 합치지 않습니다.
 - 변경 사항은 앱에 저장 버튼으로 저장합니다. 저장 전 종료하면 확인 창이 표시됩니다.
 ## 안정성 개선 (0.2.7)
 - 문구·언어·좌표·항목을 변경하면 이전 결과를 지우고 재검증 필요 상태로 표시합니다.

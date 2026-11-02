@@ -27,7 +27,7 @@ if (!(Test-Path (Join-Path $root 'vendor\ocr\python.exe'))) { throw '로컬 OCR 
 Copy-Item -LiteralPath (Join-Path $root 'vendor\ocr') -Destination $vendor -Recurse -Force
 Copy-Item (Join-Path $root 'vendor\pixelmatch.js'),(Join-Path $root 'vendor\PIXELMATCH-LICENSE.txt'),(Join-Path $root 'vendor\pixelmatch-manifest.json') $vendor -Force
 Copy-Item $NodePath (Join-Path $folder 'node.exe')
-$documentation = @('README.md','THIRD_PARTY_NOTICES.md',"CHANGES-$version.md","VALIDATION-$version.md",'LINUX.md') + @(Get-ChildItem -LiteralPath $root -Filter 'VALIDATION-20*.md' -File | Select-Object -ExpandProperty Name)
+$documentation = @('README.md','THIRD_PARTY_NOTICES.md',"CHANGES-$version.md","VALIDATION-$version.md",'LINUX.md','PRODUCT.md','DESIGN.md','BOLD-DESIGN-2026-11-02.md','SKILLS-SETUP-2026-11-02.md') + @(Get-ChildItem -LiteralPath $root -Filter 'VALIDATION-20*.md' -File | Select-Object -ExpandProperty Name) + @(Get-ChildItem -LiteralPath $root -Filter 'IMPLEMENTATION-*.md' -File | Select-Object -ExpandProperty Name)
 $documentation = @($documentation | Select-Object -Unique)
 foreach ($document in $documentation) { Copy-Item -LiteralPath (Join-Path $root $document) -Destination $folder -Force }
 Copy-Item (Join-Path $root 'version.txt'),(Join-Path $root 'release-channel.json') $folder

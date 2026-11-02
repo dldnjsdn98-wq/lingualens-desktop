@@ -13,10 +13,12 @@ for folder in ['src','linux']:
 for p in (root/'tests').glob('*.test.mjs'):files.append((p,p.relative_to(root).as_posix()))
 for p in (root/'tests/fixtures').iterdir():
     if p.is_file():files.append((p,p.relative_to(root).as_posix()))
-for path in ['tests/alignment.test.py','tests/model-preparation.test.py','tests/headless-local.mjs','tests/browser-smoke.mjs','tests/browser-runtime.mjs','tests/browser-comparison.mjs','package.json',
-             'version.txt','release-channel.json','README.md','LINUX.md',f'CHANGES-{version}.md',f'VALIDATION-{version}.md','THIRD_PARTY_NOTICES.md']:
+for path in ['tests/alignment.test.py','tests/model-preparation.test.py','tests/headless-local.mjs','tests/browser-smoke.mjs','tests/browser-runtime.mjs','tests/browser-comparison.mjs','tests/browser-lifecycle.mjs','tests/browser-design.mjs','package.json',
+             'version.txt','release-channel.json','README.md','LINUX.md',f'CHANGES-{version}.md',f'VALIDATION-{version}.md','THIRD_PARTY_NOTICES.md','PRODUCT.md','DESIGN.md','BOLD-DESIGN-2026-11-02.md','SKILLS-SETUP-2026-11-02.md']:
     files.append((root/path,path))
 for report in root.glob('VALIDATION-20*.md'):
+    files.append((report,report.name))
+for report in root.glob('IMPLEMENTATION-*.md'):
     files.append((report,report.name))
 for p in (root/'vendor').iterdir():
     if p.is_file():files.append((p,p.relative_to(root).as_posix()))

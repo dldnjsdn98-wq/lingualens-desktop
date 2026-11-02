@@ -1,0 +1,129 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-02T02:41:30.260912Z",
+  "title": "Design System: Language Test 대조 작업면과 검수 도크",
+  "extensions": {
+    "shadows": [
+      {
+        "name": "dialog",
+        "value": "0 18px 64px #263d4726",
+        "purpose": "대화상자만 떠 있는 깊이를 표현한다."
+      },
+      {
+        "name": "menu",
+        "value": "0 8px 24px #263d471a",
+        "purpose": "내보내기 메뉴의 겹침을 구분한다."
+      }
+    ],
+    "motion": [
+      {
+        "name": "control-feedback",
+        "value": "background-color .15s, border-color .15s",
+        "purpose": "컨트롤 상태 피드백. reduced-motion에서는 제거한다."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "compact-work-regions",
+        "value": "780px"
+      },
+      {
+        "name": "narrow-phone",
+        "value": "430px"
+      },
+      {
+        "name": "short-desktop",
+        "value": "750px height"
+      }
+    ],
+    "colorMeta": {
+      "accent": {
+        "role": "selection",
+        "displayName": "검수 선택 blue"
+      },
+      "frame": {
+        "role": "neutral",
+        "displayName": "Stone L-frame"
+      }
+    },
+    "typographyMeta": {
+      "body": {
+        "purpose": "외부 다운로드 없이 읽는 제품 UI"
+      },
+      "metadata": {
+        "purpose": "파일·수치·언어와 상태 보조 정보"
+      },
+      "title": {
+        "purpose": "현재 화면과 선택 문구 제목",
+        "fontSize": "18px"
+      },
+      "evidence": {
+        "purpose": "기대·OCR 문자열 전체 비교",
+        "fontSize": "max(16px, user review font)"
+      }
+    },
+    "layout": {
+      "defaultColumns": "224px minmax(0,1fr) 360px",
+      "desktopRows": "minmax(420px,1fr) max-content",
+      "dockSpan": "columns 2 / 4",
+      "dockDecision": "320px; 280px at <=1100px",
+      "compact": "<=780px one work region; <=430px expected/OCR stack"
+    }
+  },
+  "components": [
+    {
+      "name": "확인 완료 후 다음",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "검증 결과에서 다음 검수로 진행한다.",
+      "html": "<button class=\"desk-primary\">확인 완료 후 다음 →</button>",
+      "css": ".desk-primary{font:600 13px/1.5 'Segoe UI','Malgun Gothic',system-ui,sans-serif;min-height:36px;padding:7px 12px;color:#fff;background:#263d47;border:1px solid #263d47;border-radius:6px}.desk-primary:focus-visible{outline:2px solid #2f6685;outline-offset:3px}"
+    },
+    {
+      "name": "검수 메모",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "하단 검수 도크의 결정 영역에서 근거와 함께 읽는 메모.",
+      "html": "<label class=\"desk-note\">검수 메모<textarea rows=\"2\" placeholder=\"확인한 내용이나 수정할 점\"></textarea></label>",
+      "css": ".desk-note{display:grid;gap:4px;font:12px/1.5 'Segoe UI','Malgun Gothic',system-ui,sans-serif;color:#59686c}.desk-note textarea{font:inherit;font-size:14px;line-height:1.5;color:#263d47;background:#fff;border:1px solid #bfc8c7;border-radius:6px;min-height:52px;padding:7px 8px}.desk-note textarea:focus-visible{outline:2px solid #2f6685;outline-offset:3px}"
+    },
+    {
+      "name": "수동 문제 판정",
+      "kind": "chip",
+      "description": "수동 판정은 자동 검증과 구분한다.",
+      "html": "<span class=\"desk-verdict\">수동: 문제 있음</span>",
+      "css": ".desk-verdict{display:inline-flex;padding:4px 7px;border-radius:4px;font:550 11px/1.5 'Segoe UI','Malgun Gothic',system-ui,sans-serif;color:#a23545;background:#faecee}"
+    }
+  ],
+  "narrative": {
+    "northStar": "이미지와 결과를 대조하고 넓은 하단 도크에서 근거와 수동 판정을 읽는다",
+    "overview": "Stone L-frame 안에서 상단은 이미지와 결과 목록, 하단 span 도크는 기대/OCR·사유와 메모·판정을 담당한다. 긴 근거는 문서와 도크 높이를 늘린다.",
+    "keyCharacteristics": [
+      "상단 이미지·결과 대조",
+      "중앙·오른쪽 전체 폭의 검수 도크",
+      "자동·수동 판정 분리",
+      "긴 근거의 max-content 도크",
+      "작은 화면의 영역 전환과 자연 스크롤"
+    ],
+    "rules": [
+      {
+        "name": "근거를 남긴다",
+        "body": "결과 목록과 OCR 근거에 최소 공간을 확보한다.",
+        "section": "layout"
+      },
+      {
+        "name": "색은 의미다",
+        "body": "선택 blue와 semantic status를 구분한다.",
+        "section": "colors"
+      }
+    ],
+    "dos": [
+      "현재 선택·근거·메모·판정을 함께 확인한다.",
+      "실제 데이터에서 수치를 계산한다."
+    ],
+    "donts": [
+      "체커보드·그라데이션·장식 애니메이션을 추가하지 않는다.",
+      "검수 목록을 높이 경쟁으로 숨기지 않는다."
+    ]
+  }
+}

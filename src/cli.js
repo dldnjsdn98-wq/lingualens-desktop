@@ -4,6 +4,7 @@ import {randomUUID} from 'node:crypto';
 import {tmpdir,homedir} from 'node:os';
 import {join,dirname} from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {StringDecoder} from 'node:string_decoder';
 import {codexServer} from './codex-server.js';
 import {platformPaths,terminalCandidates} from './platform.js';
 const codexConnection=codexServer();
@@ -40,14 +41,29 @@ async function resolveCommand(provider){
   const choices=provider==='gemini'?[{file:platformPaths().agy,prefix:[]},...(process.platform==='win32'?[{file:join(root,'.investigation','agy.exe'),prefix:[]},{file:'agy.exe',prefix:[]}]:[{file:join(homedir(),'.local','bin','agy'),prefix:[]}])]:await candidates(provider);
   for(const cli of choices){try{await run(cli.file,[...cli.prefix,provider==='gemini'?'--help':'--version'],{timeout:10000});resolvedCommands.set(key,{cli,at:Date.now()});return cli}catch{}}return null;
 }
-export function run(file,args,{cwd,signal,timeout=120000,env={}}={}){return new Promise((resolve,reject)=>{
-  // The Windows npm shim is a .cmd file. Only fixed prompt text and private random paths reach cmd.exe.
-  const child=spawn(file,args,{cwd,windowsHide:true,signal,stdio:['ignore','pipe','pipe'],env:{...process.env,NO_COLOR:'1',...env},shell:file.toLowerCase().endsWith('.cmd')});
-  let out='',err='';const timer=setTimeout(()=>{child.kill();reject(new Error('이미지 분석 응답이 2분 안에 도착하지 않았습니다. 잠시 후 다시 시도하세요.'))},timeout);
-  child.stdout.on('data',part=>{out+=part;if(out.length>2_000_000)child.kill()});
-  child.stderr.on('data',part=>{err+=part;if(err.length>1_000_000)child.kill()});
-  child.on('error',e=>{clearTimeout(timer);reject(e)});
-  child.on('close',code=>{clearTimeout(timer);code===0?resolve(out||err):reject(new Error(friendlyError(err||out||`CLI exit ${code}`)))});
+export function run(file,args,{cwd,signal,timeout=120000,env={},spawnProcess=spawn}={}){return new Promise((resolve,reject)=>{
+  if(signal?.aborted)return reject(signal.reason);
+  if(!Number.isFinite(timeout)||timeout<=0)return reject(new RangeError('CLI 응답 제한 시간은 0보다 커야 합니다.'));
+  let child,timer,settled=false,out='',err='',outBytes=0,errBytes=0;
+  const stdout=new StringDecoder('utf8'),stderr=new StringDecoder('utf8');
+  const finish=(error,value)=>{if(settled)return;settled=true;clearTimeout(timer);signal?.removeEventListener('abort',abort);error?reject(error):resolve(value)};
+  const fail=error=>{
+    if(settled)return;finish(error);
+    try{child?.kill('SIGKILL')}catch{}
+    child?.stdout?.destroy();child?.stderr?.destroy();
+  };
+  const abort=()=>fail(signal.reason||new DOMException('취소됨','AbortError'));
+  const overflow=()=>fail(Object.assign(Error('CLI 응답이 허용 크기를 초과했습니다. 영역을 좁혀 다시 검증하세요.'),{code:'CLI_OUTPUT_TOO_LARGE'}));
+  try{
+    // The Windows npm shim is a .cmd file. Only fixed prompts and private paths reach cmd.exe.
+    child=spawnProcess(file,args,{cwd,windowsHide:true,stdio:['ignore','pipe','pipe'],env:{...process.env,NO_COLOR:'1',...env},shell:file.toLowerCase().endsWith('.cmd')});
+    child.stdout.on('data',part=>{if(settled)return;const bytes=Buffer.isBuffer(part)?part:Buffer.from(part);outBytes+=bytes.length;if(outBytes>2_000_000)return overflow();out+=stdout.write(bytes)});
+    child.stderr.on('data',part=>{if(settled)return;const bytes=Buffer.isBuffer(part)?part:Buffer.from(part);errBytes+=bytes.length;if(errBytes>1_000_000)return overflow();err+=stderr.write(bytes)});
+    child.stdout.on('error',fail);child.stderr.on('error',fail);child.on('error',fail);
+    child.on('close',code=>{if(settled)return;out+=stdout.end();err+=stderr.end();code===0?finish(null,out||err):finish(Error(friendlyError(err||out||'CLI exit '+code)))});
+    signal?.addEventListener('abort',abort,{once:true});if(signal?.aborted)return abort();
+    timer=setTimeout(()=>fail(Object.assign(Error('CLI 응답이 '+Math.max(1,Math.ceil(timeout/1000))+'초 안에 도착하지 않았습니다. 잠시 후 다시 시도하세요.'),{code:'CLI_TIMEOUT'})),timeout);
+  }catch(error){fail(error)}
 })}
 export async function commandAvailable(provider){return !!(await resolveCommand(provider))}
 export function parse(text){let source=text.trim();if(source.startsWith('```'))source=source.replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/,'');let value=JSON.parse(source);if(value.structured_output)value=value.structured_output;else if(typeof value.response==='string')value=JSON.parse(value.response.replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/,''));if(!Array.isArray(value.lines)||value.lines.some(line=>typeof line.text!=='string'))throw Error('CLI가 올바른 OCR JSON을 반환하지 않았습니다.');return {...value,extractedText:value.lines.map(line=>line.text).join('\n')}}
@@ -60,7 +76,7 @@ export async function extract(provider,bytes,type,signal,{mode='fast',wantBoxes=
   }
   else{await writeFile(schemaPath,JSON.stringify(outputSchema));raw=await run(cli.file,[...cli.prefix,'-p',`@image.${extension} ${ocrPrompt} Use view_file to view the image if needed. Do not run shell commands.`,'--output-format','json','--json-schema',schemaPath,...(mode==='fast'?['--effort','low']:[]),'--mode','plan','--sandbox','--print-timeout','110s'],{cwd:folder,signal})}
   return {...parse(raw),provider:provider+'-cli'};
-}finally{await rm(folder,{recursive:true,force:true})}}
+}finally{await rm(folder,{recursive:true,force:true,maxRetries:3,retryDelay:100})}}
 const loginSessions=new Map();
 const activeLogin=new Map();
 export async function loginState(provider){
@@ -109,6 +125,7 @@ export async function openLogin(provider){
   timer.unref();
   child.on('error',error=>finish('error',error.message||'로그인을 시작하지 못했습니다.'));
   child.on('close',code=>finish(code===0?'complete':'error',code===0?'로그인이 완료되었습니다.':(output.trim().slice(-300)||'로그인을 완료하지 못했습니다. 다시 시도하세요.')));
+  child.stdout.setEncoding('utf8');child.stderr.setEncoding('utf8');
   child.stderr.on('data',part=>{output=(output+part).slice(-1000)});
   child.stdout.on('data',part=>{
     if(provider!=='gemini'){output=(output+part).slice(-1000);return}

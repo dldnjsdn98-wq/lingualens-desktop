@@ -4,6 +4,7 @@ import {tmpdir} from 'node:os';
 import {readFile,mkdir,writeFile,mkdtemp} from 'node:fs/promises';
 import {join} from 'node:path';
 import {makeServer} from '../src/server.js';
+import {unpackWorkspaceBackup} from '../src/workspace-backup.js';
 
 const {chromium,expect,launch}=browserRuntime();
 const output=process.env.LANGUAGE_TEST_TEST_OUTPUT||await mkdtemp(join(tmpdir(),'language-test-ui-'));await mkdir(output,{recursive:true});
@@ -43,6 +44,11 @@ try{
  await expect(page.locator('.image-tab')).toHaveCount(2);await page.locator('#resultsTab').click();
  await expect(page.locator('#reviewNote')).toHaveValue('오류 테스트 메모');await expect(page.locator('#humanVerdict')).toContainText('문제 있음');checks.push('save and reopen with memo and manual issue');
  await page.locator('#cloudProject').selectOption('codex');await expect(page.locator('#connectState')).toContainText('로그인됨');
+ let heldFull,fullStarted;const fullReady=new Promise(r=>fullStarted=r);await page.route('**/api/v1/jobs',route=>{heldFull=route;fullStarted()});
+ await page.locator('#reviewFilter').selectOption('issue');await page.locator('#run').click();await fullReady;await page.locator('#cancelRun').click();
+ await expect(page.locator('#globalError')).toContainText('이전 결과와 검수 내용을 유지');await expect(page.locator('#run')).toBeEnabled();await expect(page.locator('#reviewNote')).toHaveValue('오류 테스트 메모');await expect(page.locator('#humanVerdict')).toContainText('문제 있음');await expect(page.locator('#reviewFilter')).toHaveValue('issue');await expect(page.locator('#summary')).toContainText(/자동:\s*1\s*\/\s*1/);
+ await heldFull.abort().catch(()=>{});await page.unroute('**/api/v1/jobs');await page.screenshot({path:join(output,'full-cancel-proof.png')});checks.push('full reanalysis cancellation restores OCR, manual verdict, memo and review filter');
+ await page.locator('#reviewFilter').selectOption('all');
  await page.route('**/api/v1/jobs',route=>route.abort('failed'));
  await page.locator('#run').click();await expect(page.locator('#globalError')).not.toBeEmpty();await expect(page.locator('#run')).toBeEnabled();
  await expect(page.locator('#resultCard')).toBeHidden();await expect(page.locator('#globalError')).toContainText('앱 서버에 연결하지 못했습니다');checks.push('failed analysis clears old success and restores controls');
@@ -108,6 +114,47 @@ try{
  }
  await page.unroute('**/api/v1/jobs',holdOcr);await page.route('**/api/v1/jobs',route=>route.fulfill({contentType:'application/json',body:JSON.stringify({result:{lines:[{text:'QA fresh',confidence:.99,boundingBox:{x:.1,y:.2,width:.3,height:.1}}]}})}));
  await page.locator('#openOcrDraft').click();await page.locator('#readDraftOcr').click();await expect(page.locator('#ocrDraftLines')).toContainText('QA fresh');await expect(page.locator('#readDraftOcr')).toBeEnabled();await expect(page.locator('#ocrDraftLanguage')).toBeEnabled();await expect(page.locator('#cancelDraftOcr')).toBeDisabled();await page.screenshot({path:join(output,'ocr-draft-proof.png')});await page.locator('#ocrDraftLines input').check();await page.locator('#addDraftTargets').click();await expect(page.locator('.phrase').last()).toHaveValue('QA fresh');await expect(page.locator('#ocrDraftDialog')).not.toBeVisible();checks.push('OCR draft retry creates an editable target after cancel and close');
+ // A fresh browser context keeps these regressions independent of the failure routes above.
+ await page.close();page=await browser.newPage({viewport:{width:1280,height:720}});page.setDefaultTimeout(10000);
+ page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>d.accept());
+ await page.route('**/*',route=>new URL(route.request().url()).origin===base?route.continue():route.abort('blockedbyclient'));
+ await page.goto(base);await page.locator('#cloudProject').selectOption('codex');await expect(page.locator('#connectState')).toContainText('로그인됨');
+ mockText='Start';await page.locator('.phrase').fill('Start');
+ await page.locator('#imageInput').setInputFiles({name:'review.png',mimeType:'image/png',buffer:fixture});
+ await page.locator('#run').click();await expect(page.locator('#summary')).toContainText(/자동:\s*1\s*\/\s*1/);await expect(page.locator('#run')).toBeEnabled();
+ await page.locator('#reviewNote').fill('엑셀 연결 전 검수 메모');await page.locator('#issueReview').click();await expect(page.locator('.result-verdicts')).toContainText('수동 문제');
+ await page.locator('.workspace-more > summary').click();await page.locator('#openExcelMap').click();
+ await page.locator('#mapFile').setInputFiles({name:'phrases.csv',mimeType:'text/csv',buffer:Buffer.from('filename,text,language\nreview.png,Changed,en\n')});
+ await page.locator('#previewMap').click();await expect(page.locator('#applyMap')).toBeEnabled();
+ const mappedDraft=page.waitForResponse(response=>response.url()===base+'/api/workspace/drafts'&&response.request().method()==='POST'&&response.request().postDataJSON()?.items?.some(item=>item.targets.some(t=>t.text==='Changed')));
+ await page.locator('#applyMap').click();assert.equal((await mappedDraft).status(),200);await expect(page.locator('#saveIndicator')).toContainText('임시 저장됨');
+ await page.locator('#openExcelMap').click();await page.locator('#undoMap').click();await page.getByRole('button',{name:'엑셀 문구 자동 연결 닫기',exact:true}).click();
+ await page.locator('#resultsTab').click();await expect(page.locator('#reviewNote')).toHaveValue('엑셀 연결 전 검수 메모');await expect(page.locator('.result-verdicts')).toContainText('수동 문제');
+ await page.screenshot({path:join(output,'excel-undo-proof.png')});checks.push('Excel undo restores manual verdict and memo after an actual autosave');
+ await page.route('**/api/images',route=>route.request().method()==='POST'?route.fulfill({status:500,contentType:'application/json',body:JSON.stringify({error:{message:'QA disk full'}})}):route.continue());
+ await page.locator('#imageInput').setInputFiles({name:'unsaved-backup.png',mimeType:'image/png',buffer:fixture});await expect(page.locator('.image-tab')).toHaveCount(2);
+ await expect(page.locator('#saveIndicator')).toContainText('임시 저장 실패');
+ await page.locator('#openSettings').click();const backupReady=page.waitForEvent('download');await page.locator('#saveWorkspace').click();
+ const backup=await backupReady,backupPath=join(output,'disk-full-backup.language-test.json');await backup.saveAs(backupPath);
+ const packedBackup=JSON.parse(await readFile(backupPath,'utf8'));assert.equal(packedBackup.version,2);assert.equal(Object.keys(packedBackup.assets).length,1);
+ const backedUp=unpackWorkspaceBackup(packedBackup);assert.equal(backedUp.items.length,2);
+ assert.deepEqual(Buffer.from(backedUp.items.find(i=>i.name==='unsaved-backup.png').data.split(',')[1],'base64'),fixture);
+ const restoredReview=backedUp.items.find(i=>i.name==='review.png');assert.equal(Object.values(restoredReview.reviews)[0].verdict,'issue');assert.equal(Object.values(restoredReview.reviewNotes)[0].note,'엑셀 연결 전 검수 메모');
+ await expect(page.locator('#workspaceStatus')).toContainText('백업 파일 저장 요청 완료');checks.push('disk-full image storage still allows a complete downloadable backup including restored review notes');
+ await page.getByRole('button',{name:'도구와 설정 닫기',exact:true}).click();await page.unroute('**/api/images');await page.locator('#retryDraft').click();await expect(page.locator('#saveIndicator')).toContainText('임시 저장됨');checks.push('normal autosave can retry successfully after backup during a storage failure');
+ await page.locator('#cloudProject').selectOption('gemini');await expect(page.locator('#connectState')).toHaveText('로그인됨');
+ let heldStatus,statusStarted;const oldStatusReady=new Promise(r=>statusStarted=r);
+ const lateStatus=route=>{heldStatus=route;statusStarted()};await page.route('**/auth/status?provider=codex',lateStatus);
+ await page.locator('#cloudProject').selectOption('codex');await oldStatusReady;await expect(page.locator('#connectState')).toHaveText('연결 확인 중');
+ await page.locator('#cloudProject').selectOption('gemini');await expect(page.locator('#connectState')).toHaveText('로그인됨');
+ const oldStatusResponse=page.waitForResponse(response=>response.url().endsWith('/auth/status?provider=codex'));
+ await heldStatus.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:{message:'QA old provider failed'}})});await(await oldStatusResponse).finished();
+ await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));await expect(page.locator('#connectState')).toHaveText('로그인됨');await page.unroute('**/auth/status?provider=codex',lateStatus);
+ checks.push('late status failure from Codex cannot overwrite Gemini login after switching providers');
+ await page.route('**/auth/status?provider=gemini',route=>route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:{message:'QA current status failed'}})}));
+ await page.locator('#openSettings').click();await page.locator('#refreshCli').click();await expect(page.locator('#connectState')).toHaveText('연결 상태 확인 실패');await expect(page.locator('#connectGoogle')).toHaveText('연결 상태 다시 확인');await expect(page.locator('#connectHelp')).toContainText('QA current status failed');
+ let popups=0;page.on('popup',()=>popups++);await page.unroute('**/auth/status?provider=gemini');await page.locator('#connectGoogle').click();await expect(page.locator('#connectState')).toHaveText('로그인됨');assert.equal(popups,0);await page.screenshot({path:join(output,'connection-retry-proof.png')});
+ checks.push('failed login status retries in the app instead of opening an unrelated installation page');
  assert.deepEqual(errors,[]);checks.push('no uncaught browser errors');
  await writeFile(join(output,'ui-result.json'),JSON.stringify({status:'pass',version,checks,errors,data},null,2));console.log(JSON.stringify({status:'pass',checks,report:join(output,'ui-result.json')}));
 }catch(error){

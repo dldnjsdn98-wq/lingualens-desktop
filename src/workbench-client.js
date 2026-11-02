@@ -5,10 +5,16 @@ function mountWorkbench(){
   document.body.classList.add('workbench');
   const app=document.querySelector('.app'),layout=document.querySelector('.layout'),side=document.querySelector('.workspace-card'),preview=document.querySelector('.preview-card'),inspector=document.querySelector('.inspector-card');
   document.querySelector('.hero').hidden=true;
+  const title=document.querySelector('.hero h1');title.className='desk-title';title.textContent='스크린샷 검수';preview.querySelector('.head h2').replaceWith(title);
+  const workflow=document.createElement('ol');workflow.className='desk-workflow';workflow.setAttribute('aria-label','검수 순서');workflow.innerHTML='<li>1 이미지</li><li>2 문구 설정</li><li>3 검수</li>';preview.querySelector('.head').append(workflow);
+  document.querySelector('.brand small').textContent='로컬 문구 검수';
+  document.querySelector('.brand-mark').innerHTML='<svg viewBox="0 0 32 32" fill="none" aria-hidden="true"><path d="M9 4H4v5m19-5h5v5M4 23v5h5m14 0h5v-5M12 10v12h9" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   const shell=document.createElement('div');shell.className='workbench-shell';
   const center=document.createElement('div');center.className='workbench-center';
   const right=document.createElement('aside');right.className='workbench-right';right.setAttribute('aria-label','문구와 검증 결과');
-  layout.before(shell);shell.append(side,center,right);center.append(preview);
+  const compactNav=document.createElement('nav');compactNav.className='desktop-compact-nav';compactNav.setAttribute('aria-label','작업 영역');compactNav.innerHTML='<h1>문구 검수</h1><button type="button" data-mobile-view="canvas" aria-pressed="true">이미지</button><button type="button" data-mobile-view="review" aria-pressed="false">검수</button><button type="button" data-mobile-view="images" aria-pressed="false">작업 목록</button>';
+  document.body.dataset.mobileView='canvas';compactNav.onclick=event=>{const button=event.target.closest('[data-mobile-view]');if(button)setMobileWorkbenchView(button.dataset.mobileView)};
+  layout.before(compactNav,shell);shell.append(side,center,right);center.append(preview);
   const tabs=document.createElement('div');tabs.className='workbench-tabs';tabs.setAttribute('role','tablist');tabs.setAttribute('aria-label','작업 패널');
   tabs.innerHTML='<button id="settingsTab" role="tab" aria-controls="settingsPane" aria-selected="true">문구 설정</button><button id="resultsTab" role="tab" aria-controls="resultsPane" aria-selected="false" tabindex="-1">검증 결과</button>';
   right.append(tabs);
@@ -34,7 +40,7 @@ function mountWorkbench(){
   historyDialog.append(document.querySelector('.history-card'));
   const historyStatus=document.createElement('p');historyStatus.id='historyStatus';historyStatus.className='help';historyStatus.setAttribute('role','status');$('history').before(historyStatus);
   $('openSettings').onclick=()=>settingsDialog.showModal();$('openLibrary').onclick=()=>{refreshLibrary();refreshTrash();libraryDialog.showModal()};
-  const historyButton=document.createElement('button');historyButton.id='openHistory';historyButton.className='ghost small';historyButton.textContent='최근 기록';historyButton.onclick=()=>historyDialog.showModal();settingsDialog.prepend(historyButton);
+  const historyButton=document.createElement('button');historyButton.id='openHistory';historyButton.className='ghost small';historyButton.textContent='최근 기록';historyButton.onclick=()=>historyDialog.showModal();settingsDialog.querySelector('.dialog-heading').after(historyButton);
   const head=side.querySelector('.head');head.querySelector('h2').textContent='작업 이미지';head.querySelector('p').remove();
   const metadata=side.querySelector('.toolbar'),info=document.createElement('details');info.className='workspace-info';info.innerHTML='<summary>작업 이름·폴더</summary>';
   metadata.before(info);info.append(...metadata.querySelectorAll('label'),$('folderNames'));
@@ -79,8 +85,9 @@ function refreshWorkbench(){if(!UI?.ready)return;
   refreshSavedIndicator();if(typeof UX!=='undefined'&&UX.ready)refreshUx();if(typeof F!=='undefined'&&F.ready)refreshFeatures();
 }
 function runPrimary(){return W.items.some(x=>x.selected)?prepareBatch('selected'):run()}
+function setMobileWorkbenchView(view){document.body.dataset.mobileView=view;document.querySelectorAll('button[data-mobile-view]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.mobileView===view)));document.querySelector('.desktop-compact-nav h1').textContent=view==='images'?'작업 이미지':'문구 검수';if(view==='canvas'&&typeof UX!=='undefined'&&UX.zoomMode==='fit')requestAnimationFrame(()=>fitViewport())}
 function workbenchEntry(id){return [...$('entries').children].find(row=>row.dataset.id===id)}
-function setWorkbenchTab(tab){if(!UI?.ready)return;UI.tab=tab;for(const [name,id] of [['settings','settingsTab'],['results','resultsTab']]){$(id).setAttribute('aria-selected',String(tab===name));$(id).tabIndex=tab===name?0:-1;$(name==='settings'?'settingsPane':'resultsPane').classList.toggle('hidden',tab!==name)}document.body.classList.toggle('viewing-results',tab==='results');$('resultEmpty').classList.toggle('hidden',!!S.last);if(tab==='results'){stopRegion();$('canvasEvidence').classList.remove('hidden')}else{$('canvasEvidence').classList.add('hidden')}regions();if(typeof F!=='undefined'&&F.ready)refreshFeatureResults()}
+function setWorkbenchTab(tab){if(!UI?.ready)return;UI.tab=tab;for(const [name,id] of [['settings','settingsTab'],['results','resultsTab']]){$(id).setAttribute('aria-selected',String(tab===name));$(id).tabIndex=tab===name?0:-1;$(name==='settings'?'settingsPane':'resultsPane').classList.toggle('hidden',tab!==name)}document.body.classList.toggle('viewing-results',tab==='results');$('resultEmpty').classList.toggle('hidden',!!S.last);if(tab==='results'){setMobileWorkbenchView('review');stopRegion();$('canvasEvidence').classList.remove('hidden')}else{$('canvasEvidence').classList.add('hidden')}regions();if(typeof F!=='undefined'&&F.ready)refreshFeatureResults()}
 function setCanvasMode(mode){if(!UI?.ready)return;if(mode!=='draw')stopRegion();UI.mode=mode;document.body.dataset.canvasMode=mode;[['select','canvasSelect'],['move','canvasMove'],['draw','canvasDraw']].forEach(([name,id])=>$(id).setAttribute('aria-pressed',String(mode===name)));$('canvasHint').textContent=mode==='draw'?'드래그하여 새 영역 지정':mode==='move'?'드래그하여 이미지 이동':'영역을 선택하고 모서리로 크기 조절';regions()}
 function beginCanvasDrag(event){if(!UI.ready||event.button!==0||W.busy||W.operation||S.controller||UI.mode==='draw'||F?.ignoreDrawing)return;const viewport=$('canvasViewport');
   if(UI.mode==='move'){UI.drag={kind:'pan',pointer:event.pointerId,x:event.clientX,y:event.clientY,left:viewport.scrollLeft,top:viewport.scrollTop}}

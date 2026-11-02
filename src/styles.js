@@ -2,6 +2,7 @@ import {enhancementStyles} from './enhancement-styles.js';
 import {workbenchStyles} from './workbench-styles.js';
 import {featureStyles} from './feature-styles.js';
 import {uxStyles} from './ux-styles.js';
+import {reviewDeskStyles} from './review-desk-styles.js';
 export const styles=String.raw`
 :root{--ink:#10203a;--muted:#66748b;--line:#dbe3ef;--brand:#285be8;--brand2:#7147e8;--surface:rgba(255,255,255,.95);--good:#12815c;--bad:#c43d4f;--warn:#b66d00}
 *{box-sizing:border-box}html{scroll-behavior:auto}body{margin:0;min-height:100vh;background:radial-gradient(circle at 8% 0%,#dce8ff 0,transparent 34%),radial-gradient(circle at 92% 8%,#eee3ff 0,transparent 30%),#f3f6fb;color:var(--ink);font:450 16px/1.55 Pretendard,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;letter-spacing:-.01em}
@@ -39,5 +40,6 @@ ${workbenchStyles}
 ${featureStyles}
 ${uxStyles}
 ${enhancementStyles}
+${reviewDeskStyles}
 `;
 

@@ -54,6 +54,11 @@ export function validateWorkspace(data) {
           typeof x.reason==='string'&&region(x.region)&&
           [x.evidence,x.nearestEvidence].every(list=>list==null||(Array.isArray(list)&&list.every(line)))&&
           (x.missingCandidates==null||Array.isArray(x.missingCandidates))))throw Error('저장된 검증 결과 형식을 확인하세요.');
+      // Metadata from imported backups reaches summaries and history as well as OCR rows.
+      // Keep absent legacy metadata valid; supplied numeric fields must really be numbers.
+      if(['foundCount','totalCount','reviewCount'].some(key=>r[key]!=null&&(!Number.isInteger(r[key])||r[key]<0||r[key]>80))||
+        (r.confidence!=null&&(!Number.isFinite(r.confidence)||r.confidence<0||r.confidence>1))||
+        (r.timing!=null&&(!object(r.timing)||['totalMs','providerMs','regionMs'].some(key=>r.timing[key]!=null&&(!Number.isFinite(r.timing[key])||r.timing[key]<0)))))throw Error('저장된 검증 결과의 수치 정보를 확인하세요.');
     }
   }
   return data;

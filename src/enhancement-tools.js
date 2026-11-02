@@ -28,7 +28,7 @@ export function unicodeChanges(expected,observed,limit=3000) {
 export function normalizePreferences(value={}) {
   const number=(v,min,max,fallback)=>Number.isFinite(Number(v))?Math.max(min,Math.min(max,Number(v))):fallback;
   return {layout:['standard','image','text'].includes(value.layout)?value.layout:'standard',
-    leftWidth:number(value.leftWidth,180,380,238),rightWidth:number(value.rightWidth,300,620,390),
+    leftWidth:number(value.leftWidth,180,380,224),rightWidth:number(value.rightWidth,300,620,360),
     fontSize:number(value.fontSize,12,18,14),density:value.density==='comfortable'?'comfortable':'compact',
     minimap:value.minimap!==false};
 }

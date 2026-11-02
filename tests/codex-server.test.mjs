@@ -8,7 +8,11 @@ test('Codex connection reuses its process, delivers final output and restarts af
   try{
     assert.equal(JSON.parse(await server.extract(cli,options)).lines[0].text,'1');
     const progress=[];assert.equal(JSON.parse(await server.extract(cli,{...options,onProgress:stage=>progress.push(stage)})).lines[0].text,'2');assert.ok(progress.some(x=>x.includes('응답')));
-    await assert.rejects(server.extract(cli,{...options,prompt:'WAIT',signal:AbortSignal.timeout(50)}),error=>['TimeoutError','AbortError'].includes(error.name));
+    const controller=new AbortController();let turnStarted=false;
+    await assert.rejects(server.extract(cli,{...options,prompt:'WAIT',signal:controller.signal,onProgress:stage=>{
+      if(stage.includes('응답')){turnStarted=true;controller.abort()}
+    }}),{name:'AbortError'});
+    assert.equal(turnStarted,true,'cancel only after the mock confirms the submitted turn has started');
     assert.equal(JSON.parse(await server.extract(cli,options)).lines[0].text,'1');
   }finally{server.close()}
 });

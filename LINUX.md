@@ -21,8 +21,8 @@ sudo apt install nodejs python3 python3-venv ca-certificates libgl1 libglib2.0-0
 ## 2. 압축 해제·설치·실행
 
 ```bash
-tar -xzf Language-Test-Linux-x64-0.4.4-preview.tar.gz
-cd Language-Test-Linux-x64-0.4.4
+tar -xzf Language-Test-Linux-x64-0.4.5-preview.tar.gz
+cd Language-Test-Linux-x64-0.4.5
 ./linux/install.sh
 ./linux/start.sh
 ```
@@ -87,6 +87,8 @@ dot에 맡길 기본 테스트:
 작업 데이터와 캐시는 테스트 전용 임시 폴더에 저장합니다. 결과 로그 경로를 출력하며 실패하면 0 이외의 종료 코드를 반환합니다. OCR 설치 전 공통 로직만 검사하려면 `./linux/test-headless.sh --skip-ocr`를 사용합니다. 이 경우 OCR 검증은 **SKIP**으로 남습니다.
 
 dot 결과에 포함할 항목: `cat /etc/os-release`, `uname -m`, `ldd --version`, `node --version`, `python3 --version`, 테스트 종료 코드와 출력 로그. 토큰·인증 코드·개인 이미지는 필요하지 않습니다.
+
+브라우저를 설치한 환경에서는 GUI 세션 없이 `npm run test:browser`, `npm run test:comparison`, `npm run test:lifecycle`도 실행할 수 있습니다. 준비 방법은 README의 브라우저 검사 안내를 따르세요. 로그인·AI 응답은 모의하며, `test:lifecycle`은 로그인 실패·도구 변경과 일괄 검증 취소·재개를 확인합니다. 실제 AI 로그인 검증이나 Debian 실기기 검증을 대체하지 않습니다.
 
 ## 4. 저장 위치와 CLI
 

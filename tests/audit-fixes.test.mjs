@@ -38,7 +38,8 @@ function context(item){
  c.saveDraft=async()=>{c.snapshot();return {ok:true,saved:true}};
  c.invalidateFeatureImage=(i,m)=>{i.payload=null;i.resultTargets=[];i.problem=m;c.S.last=null};
  c.analyzeImage=async()=>{throw Error('Network timeout')};
- Object.assign(c,{migrateReviews,reviewOverview});vm.createContext(c);
+ Object.assign(c,{migrateReviews,reviewOverview,UX:{filter:'all',search:''}});vm.createContext(c);
+ vm.runInContext(featureClient.slice(featureClient.indexOf('function captureAnalysisResult('),featureClient.indexOf('function invalidateFeatureImage(')),c);
  vm.runInContext(workspaceClient.slice(workspaceClient.indexOf('function snapshot()'),workspaceClient.indexOf('function dirty()')),c);
  vm.runInContext(featureClient.slice(featureClient.indexOf('function batchSignature(')),c);
  return c;

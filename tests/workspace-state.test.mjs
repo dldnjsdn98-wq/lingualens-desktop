@@ -37,3 +37,17 @@ test('batch rejects duplicate IDs and unrelated completion records but allows pr
  w.batch={ids:['a'],done:{b:'signature'},status:'paused'};assert.throws(()=>validateWorkspace(w),/완료 기록/);
  w.batch={ids:['removed-image'],done:{'removed-image':'signature'},status:'paused'};assert.equal(validateWorkspace(w),w);
 });
+
+test('backup result metadata rejects text and non-finite numbers while accepting legacy and current results',()=>{
+ const w=workspace();w.items[0].payload={result:{lines:[],results:[{...target,found:true,reason:'matched'}]}};
+ assert.equal(validateWorkspace(w),w); // Older backups may omit these summary fields.
+ Object.assign(w.items[0].payload.result,{foundCount:1,totalCount:1,reviewCount:0,confidence:.99,timing:{totalMs:12,providerMs:10,regionMs:0,cacheHit:true}});
+ assert.equal(validateWorkspace(w),w);
+ for(const key of ['foundCount','totalCount','reviewCount'])for(const invalid of ['<span>not a number</span>','1',-1,1.5,81,Infinity]){
+  const changed=structuredClone(w);changed.items[0].payload.result[key]=invalid;assert.throws(()=>validateWorkspace(changed),/수치 정보/);
+ }
+ for(const key of ['totalMs','providerMs','regionMs'])for(const invalid of ['<span>not a duration</span>',-1,Infinity]){
+  const changed=structuredClone(w);changed.items[0].payload.result.timing[key]=invalid;assert.throws(()=>validateWorkspace(changed),/수치 정보/);
+ }
+ for(const invalid of ['.99',-1,2,NaN]){const changed=structuredClone(w);changed.items[0].payload.result.confidence=invalid;assert.throws(()=>validateWorkspace(changed),/수치 정보/)}
+});
